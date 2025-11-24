@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RNBList } from './RNBList';
 import { Item, LatLng } from '../types';
 import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, useMap } from 'react-leaflet';
@@ -12,6 +12,25 @@ interface DetailPanelProps {
   onValidate: () => void;
 }
 
+const metaEnv = ((import.meta as any)?.env ?? {}) as Record<string, string> & { DEV?: boolean };
+const RNB_API_BASE = metaEnv.VITE_RNB_API ?? (metaEnv.DEV ? '/rnb' : 'https://rnb-api.beta.gouv.fr');
+
+const DEFAULT_TILE_STYLE: L.PathOptions = {
+  fillColor: '#CBD5E1',
+  color: '#94A3B8',
+  weight: 0.6,
+  fillOpacity: 0.18
+};
+
+const SELECTED_TILE_STYLE: L.PathOptions = {
+  fillColor: '#EA580C',
+  color: '#C2410C',
+  weight: 1.6,
+  fillOpacity: 0.65
+};
+
+const CLICK_DEBOUNCE_MS = 600;
+
 export function DetailPanel({
   item,
   items,
@@ -20,6 +39,7 @@ export function DetailPanel({
 }: DetailPanelProps) {
   const [rnbIds, setRnbIds] = useState<string[]>(item.rnbIds);
   const [zoneActive, setZoneActive] = useState(false);
+  const polygonRef = useRef<L.Polygon | null>(null);
 
   useEffect(() => {
     setRnbIds(item.rnbIds);
@@ -34,11 +54,25 @@ export function DetailPanel({
   }, [item]);
 
   const polygonOptions = useMemo(() => ({
-    color: zoneActive ? '#BE185D' : '#1D4ED8',
-    fillColor: zoneActive ? 'rgba(236,72,153,0.6)' : 'rgba(59,130,246,0.35)',
-    weight: 2,
-    dashArray: '6,6'
+    color: zoneActive ? '#C2410C' : '#94A3B8',
+    fillColor: zoneActive ? 'rgba(234,88,12,0.45)' : '#94A3B8',
+    fillOpacity: zoneActive ? 0.45 : 0,
+    weight: 2.5,
+    dashArray: zoneActive ? undefined : '6,6'
   }), [zoneActive]);
+
+  const ensureStrokeOnlyInteraction = () => {
+    const polygon = polygonRef.current;
+    if (!polygon) return;
+    const path = (polygon as any).getElement?.() as SVGPathElement | undefined;
+    if (path) {
+      path.setAttribute('pointer-events', 'stroke');
+    }
+  };
+
+  useEffect(() => {
+    ensureStrokeOnlyInteraction();
+  }, [item.zone]);
 
   const toggleZoneColor = () => setZoneActive(prev => !prev);
 
@@ -46,17 +80,11 @@ export function DetailPanel({
     setRnbIds(ids => ids.filter(rnbId => rnbId !== deletedId));
   };
 
-  const onAddRNB = (rnbId: string) => {
-    setRnbIds(ids => [...ids, rnbId]);
-  };
-
-  const onSelectRnbIdOnMap = (rnbId: string) => {
-    if (rnbIds.includes(rnbId)) {
-      onDeleteRNB(rnbId);
-      return;
-    }
-    onAddRNB(rnbId);
-  };
+  const onSelectRnbIdOnMap = useCallback((rnbId: string) => {
+    setRnbIds(ids => ids.includes(rnbId)
+      ? ids.filter(existing => existing !== rnbId)
+      : [...ids, rnbId]);
+  }, []);
 
   const selectionSummary = `${item.name} · ${item.address}`;
 
@@ -160,16 +188,7 @@ export function DetailPanel({
                   />
                   <RnbTileLayer selectedRnbIds={rnbIds} key={rnbIds.join(',')} onSelectRnbIdOnMap={onSelectRnbIdOnMap} />
                   <BoundsController bounds={mapBounds} />
-                  <Polygon
-                    positions={item.zone}
-                    pathOptions={polygonOptions}
-                    eventHandlers={{ click: toggleZoneColor }}
-                  >
-                    <Popup>
-                      <p className="text-sm font-semibold">Zone {item.name}</p>
-                      <p className="text-xs text-gray-500">Cliquez pour colorer</p>
-                    </Popup>
-                  </Polygon>
+           
                   {items.map(mapItem => {
                     const highlight = mapItem.id === item.id;
                     return (
@@ -233,16 +252,14 @@ function BoundsController({ bounds }: { bounds: LatLng[] }) {
 
 function RnbTileLayer({ selectedRnbIds, onSelectRnbIdOnMap }: { selectedRnbIds: string[], onSelectRnbIdOnMap: (rnbId: string) => void }) {
   const map = useMap();
+  const vectorLayerRef = useRef<any>(null);
+  const previousSelectionRef = useRef<string[]>([]);
+  const lastClickRef = useRef<number>(0);
 
   useEffect(() => {
-    const vectorLayer = L.vectorGrid.protobuf("https://rnb-api.beta.gouv.fr/api/alpha/tiles/shapes/{x}/{y}/{z}.pbf", {
+    const vectorLayer = L.vectorGrid.protobuf(`${RNB_API_BASE}/api/alpha/tiles/shapes/{x}/{y}/{z}.pbf`, {
       vectorTileLayerStyles: {
-        default: {
-          fillColor: '#9CA3AF',
-          color: '#6B7280',
-          weight: 0.4,
-          fillOpacity: 0.5
-        }
+        default: DEFAULT_TILE_STYLE
       },
       interactive: false,
       getFeatureId: (feature: any) => feature.properties.rnb_id,
@@ -250,37 +267,73 @@ function RnbTileLayer({ selectedRnbIds, onSelectRnbIdOnMap }: { selectedRnbIds: 
       opacity: 1
     });
 
+    vectorLayerRef.current = vectorLayer;
     vectorLayer.addTo(map);
 
-    for (const rnbId of selectedRnbIds) {
-      vectorLayer.setFeatureStyle(rnbId, {
-        fillColor: '#3B82F6',
-        color: '#1D4ED8',
-        weight: 1.5,
-        fillOpacity: 0.7
-      });
-    }
-
-    // This is a hack to select the closest RNB when clicking on the map
-    // Ideally we would like to use the proper Leaflet API
     const clickHandler = async (event: LeafletMouseEvent) => {
-      const latlng = event.latlng;
-      const res = await fetch(`https://rnb-api.beta.gouv.fr/api/alpha/buildings/closest/?point=${latlng.lat},${latlng.lng}&radius=5`);
-      const data = await res.json();
-      const rnbIds = data.results.map((result: any) => result.rnb_id);
-      const closestRnbId = rnbIds[0];
-      if (closestRnbId) {
-        onSelectRnbIdOnMap(closestRnbId);
+      const now = Date.now();
+      if (now - lastClickRef.current < CLICK_DEBOUNCE_MS) {
+        return;
+      }
+      lastClickRef.current = now;
+
+      const { lat, lng } = event.latlng;
+      try {
+        const res = await fetch(`${RNB_API_BASE}/api/alpha/buildings/closest/?point=${lat},${lng}&radius=5`);
+        if (!res.ok) {
+          console.warn('Recherche RNB impossible', res.status);
+          return;
+        }
+        const data = await res.json();
+        const rnbId = data.results?.[0]?.rnb_id;
+        if (rnbId) {
+          onSelectRnbIdOnMap(rnbId);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la sélection RNB sur la carte', error);
       }
     };
 
     map.on('click', clickHandler);
 
     return () => {
-      map.removeLayer(vectorLayer);
       map.off('click', clickHandler);
+      if (vectorLayerRef.current) {
+        map.removeLayer(vectorLayerRef.current);
+        vectorLayerRef.current = null;
+      }
+      previousSelectionRef.current = [];
+      lastClickRef.current = 0;
     };
-  }, [map]);
+  }, [map, onSelectRnbIdOnMap]);
+
+  useEffect(() => {
+    const vectorLayer = vectorLayerRef.current;
+    if (!vectorLayer) {
+      return;
+    }
+
+    const previous = previousSelectionRef.current;
+    for (const prevId of previous) {
+      if (!selectedRnbIds.includes(prevId)) {
+        try {
+          vectorLayer.resetFeatureStyle(prevId as any);
+        } catch (error) {
+          console.warn('Impossible de réinitialiser le style du RNB', prevId, error);
+        }
+      }
+    }
+
+    for (const rnbId of selectedRnbIds) {
+      try {
+        vectorLayer.setFeatureStyle(rnbId as any, SELECTED_TILE_STYLE);
+      } catch (error) {
+        console.warn('Impossible de styliser le RNB', rnbId, error);
+      }
+    }
+
+    previousSelectionRef.current = selectedRnbIds;
+  }, [selectedRnbIds]);
 
   return null;
 }
