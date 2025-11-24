@@ -146,7 +146,7 @@ export function DetailPanel({
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  <RnbTileLayer />
+                  <RnbTileLayer selectedRnbIds={rnbIds} key={rnbIds.join(',')} />
                   <BoundsController bounds={mapBounds} />
                   <Polygon
                     positions={item.zone}
@@ -219,7 +219,7 @@ function BoundsController({ bounds }: { bounds: LatLng[] }) {
   return null;
 }
 
-function RnbTileLayer() {
+function RnbTileLayer({ selectedRnbIds }: { selectedRnbIds: string[] }) {
   const map = useMap();
 
   useEffect(() => {
@@ -233,11 +233,21 @@ function RnbTileLayer() {
         }
       },
       interactive: false,
+      getFeatureId: (feature: any) => feature.properties.rnb_id,
       zIndex: 350,
       opacity: 1
     });
 
     vectorLayer.addTo(map);
+
+    for (const rnbId of selectedRnbIds) {
+      vectorLayer.setFeatureStyle(rnbId, {
+        fillColor: '#3B82F6',
+        color: '#1D4ED8',
+        weight: 1.5,
+        fillOpacity: 0.7
+      });
+    }
 
     return () => {
       map.removeLayer(vectorLayer);
