@@ -1,31 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { RNBList } from './RNBList';
-interface DetailItem {
-  id: string;
-  name: string;
-  address: string;
-  score: string;
-  surface: string;
-  usage: string;
-  gestionnaire: string;
-}
-interface RNBItem {
-  id: string;
-}
+import { Item } from '../types';
+
 interface DetailPanelProps {
-  item: DetailItem;
-  rnbItems: RNBItem[];
-  onDeleteRNB: (id: string) => void;
+  item: Item;
   onRefuse: () => void;
   onValidate: () => void;
 }
 export function DetailPanel({
   item,
-  rnbItems,
-  onDeleteRNB,
   onRefuse,
   onValidate
 }: DetailPanelProps) {
+  const [rnbIds, setRnbIds] = useState<string[]>(
+    item.rnbIds
+  );
+  const onDeleteRNB = (id: string) => {
+    setRnbIds(rnbIds.filter(id => id !== id));
+  };
+  const onAddRNB = () => {
+    setRnbIds([...rnbIds, `ID-RNB-${rnbIds.length + 1}`]);
+  };
   return <div className="flex-1 flex flex-col bg-gray-50 h-screen">
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto p-8">
@@ -47,10 +42,6 @@ export function DetailPanel({
 
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-gray-500">Nom</label>
-                <p className="text-base text-gray-900 mt-1">{item.name}</p>
-              </div>
-              <div>
                 <label className="text-sm font-medium text-gray-500">
                   Adresse
                 </label>
@@ -61,15 +52,15 @@ export function DetailPanel({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-500">
-                    Score
+                    Nom
                   </label>
-                  <p className="text-base text-gray-900 mt-1">—</p>
+                  <p className="text-base text-gray-900 mt-1">{item.name}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">
                     Surface
                   </label>
-                  <p className="text-base text-gray-900 mt-1">—</p>
+                  <p className="text-base text-gray-900 mt-1">{item.surface}m²</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -77,13 +68,13 @@ export function DetailPanel({
                   <label className="text-sm font-medium text-gray-500">
                     Usage
                   </label>
-                  <p className="text-base text-gray-900 mt-1">—</p>
+                  <p className="text-base text-gray-900 mt-1">{item.usage}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">
                     Gestionnaire
                   </label>
-                  <p className="text-base text-gray-900 mt-1">—</p>
+                  <p className="text-base text-gray-900 mt-1">{item.gestionnaire}</p>
                 </div>
               </div>
             </div>
@@ -94,7 +85,7 @@ export function DetailPanel({
             <h3 className="text-sm font-semibold text-gray-700 mb-3">
               Éléments RNB
             </h3>
-            <RNBList items={rnbItems} onDelete={onDeleteRNB} />
+            <RNBList items={rnbIds} onDelete={onDeleteRNB} />
           </div>
 
           {/* Map Section */}
