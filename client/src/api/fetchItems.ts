@@ -1,11 +1,12 @@
 import { Item, LatLng } from '../types';
 import data from '../data.json';
+import { Buffer } from 'buffer';
 
 type RawItem = {
   Code_bat_ter: number | string;
   Libelle_bat_ter: string;
   Adresse: string;
-  Code_Postal: string;
+  Code_Postal: string | number;
   Ville: string;
   Completude: string | number;
   Surface_de_plancher: string | number;
@@ -15,6 +16,7 @@ type RawItem = {
   contre_proposition_rnb_ids: string;
   coordinates?: [number, number];
   zone?: [number, number][];
+  geometry?: string;
 };
 
 const rawDataset = data as RawItem[];
@@ -52,12 +54,46 @@ function buildZone(rawZone: RawItem['zone'], fallback: LatLng): LatLng[] {
   ];
 }
 
+function parseGeometryPoint(geometry?: string): LatLng {
+  if (!geometry) {
+    return [0, 0];
+  }
+
+  try {
+    const buffer = Buffer.from(geometry.replace(/\s+/g, ''), 'hex');
+    const byteOrder = buffer.readUInt8(0);
+    const littleEndian = byteOrder === 1;
+    const readUInt32 = littleEndian ? buffer.readUInt32LE.bind(buffer) : buffer.readUInt32BE.bind(buffer);
+    const readDouble = littleEndian ? buffer.readDoubleLE.bind(buffer) : buffer.readDoubleBE.bind(buffer);
+
+    let offset = 1;
+    const typeField = readUInt32(offset);
+    offset += 4;
+    const hasSrid = (typeField & 0x20000000) !== 0;
+    if (hasSrid) {
+      offset += 4; // skip SRID
+    }
+
+    const x = readDouble(offset);
+    offset += 8;
+    const y = readDouble(offset);
+
+    return [y, x];
+  } catch (error) {
+    return [0, 0];
+  }
+}
+
 function transformRawItem(rawItem: RawItem): Item {
   const parsedRnbIds = parseRnbIds(rawItem.rnb_ids);
   const contrePropositionRnbIds = parseRnbIds(rawItem.contre_proposition_rnb_ids);
-  const address = rawItem.Adresse + ' ' + rawItem.Code_Postal + ' ' + rawItem.Ville;
+  const postalCode = rawItem.Code_Postal ? rawItem.Code_Postal.toString() : '';
+  const addressParts = [rawItem.Adresse, postalCode, rawItem.Ville].filter(Boolean);
+  const address = addressParts.join(' ');
   const coordinates = toLatLng(rawItem.coordinates);
-  const zone = buildZone(rawItem.zone, coordinates);
+  const parsedGeometry = parseGeometryPoint(rawItem.geometry);
+  const finalCoordinates = coordinates[0] === 0 && coordinates[1] === 0 ? parsedGeometry : coordinates;
+  const zone = buildZone(rawItem.zone, finalCoordinates);
 
   return {
     id: rawItem.Code_bat_ter.toString(),
@@ -68,7 +104,7 @@ function transformRawItem(rawItem: RawItem): Item {
     usage: rawItem.Usage_detaille_du_bien,
     gestionnaire: rawItem.Gestionnaire,
     rnbIds: contrePropositionRnbIds.length > 0 ? contrePropositionRnbIds : parsedRnbIds,
-    coordinates,
+    coordinates: finalCoordinates,
     zone
   };
 }
