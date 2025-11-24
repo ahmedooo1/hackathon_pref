@@ -1,5 +1,4 @@
 import React from 'react';
-import { Trash2Icon, PlusIcon } from 'lucide-react';
 interface RNBListProps {
   items: string[];
   onDelete: (id: string) => void;
