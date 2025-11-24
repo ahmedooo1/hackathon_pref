@@ -1,17 +1,12 @@
-import React from 'react';
-import { SearchIcon } from 'lucide-react';
-interface SidebarItem {
-  id: string;
-  name: string;
-}
+import { Item } from '../types';
 interface SidebarProps {
-  items: SidebarItem[];
-  selectedId: string;
-  onSelect: (id: string) => void;
+  items: Item[];
+  selectedItem: Item;
+  onSelect: (item: Item) => void;
 }
 export function Sidebar({
   items,
-  selectedId,
+  selectedItem,
   onSelect
 }: SidebarProps) {
   return <div className="w-80 bg-white border-r border-gray-200 flex flex-col h-screen">
@@ -26,8 +21,8 @@ export function Sidebar({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {items.map(item => <button key={item.id} onClick={() => onSelect(item.id)} className={`w-full text-left p-4 border-b border-gray-100 transition-all ${selectedId === item.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'hover:bg-gray-50'}`}>
-            <div className={`font-semibold text-sm mb-1 ${selectedId === item.id ? 'text-blue-700' : 'text-gray-900'}`}>
+        {items.map(item => <button key={item.id} onClick={() => onSelect(item)} className={`w-full text-left p-4 border-b border-gray-100 transition-all ${selectedItem.id === item.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'hover:bg-gray-50'}`}>
+            <div className={`font-semibold text-sm mb-1 ${selectedItem.id === item.id ? 'text-blue-700' : 'text-gray-900'}`}>
               {item.id}
             </div>
             <div className="text-sm text-gray-600">{item.name}</div>
