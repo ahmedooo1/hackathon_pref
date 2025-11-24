@@ -22,7 +22,8 @@ function transformRawItem(rawItem: any): Item {
     surface: rawItem.Surface_de_plancher.toString(),
     usage: rawItem.Usage_detaille_du_bien,
     gestionnaire: rawItem.Gestionnaire,
-    rnbIds: contrePropositionRnbIds.length > 0 ? contrePropositionRnbIds : parsedRnbIds
+    rnbIds: contrePropositionRnbIds.length > 0 ? contrePropositionRnbIds : parsedRnbIds,
+    rawData: rawItem
   };
 }
 

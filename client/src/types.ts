@@ -7,5 +7,6 @@ export type Item = {
   usage: string;
   gestionnaire: string;
   rnbIds: string[];
+  rawData: any;
 }
 
