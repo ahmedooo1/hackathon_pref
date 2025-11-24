@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { RNBList } from './RNBList';
 import { Item, LatLng } from '../types';
 import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import L, { LeafletMouseEvent } from 'leaflet';
 import 'leaflet.vectorgrid';
 
 interface DetailPanelProps {
@@ -44,6 +44,18 @@ export function DetailPanel({
 
   const onDeleteRNB = (deletedId: string) => {
     setRnbIds(ids => ids.filter(rnbId => rnbId !== deletedId));
+  };
+
+  const onAddRNB = (rnbId: string) => {
+    setRnbIds(ids => [...ids, rnbId]);
+  };
+
+  const onSelectRnbIdOnMap = (rnbId: string) => {
+    if (rnbIds.includes(rnbId)) {
+      onDeleteRNB(rnbId);
+      return;
+    }
+    onAddRNB(rnbId);
   };
 
   const selectionSummary = `${item.name} · ${item.address}`;
@@ -146,7 +158,7 @@ export function DetailPanel({
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  <RnbTileLayer selectedRnbIds={rnbIds} key={rnbIds.join(',')} />
+                  <RnbTileLayer selectedRnbIds={rnbIds} key={rnbIds.join(',')} onSelectRnbIdOnMap={onSelectRnbIdOnMap} />
                   <BoundsController bounds={mapBounds} />
                   <Polygon
                     positions={item.zone}
@@ -219,7 +231,7 @@ function BoundsController({ bounds }: { bounds: LatLng[] }) {
   return null;
 }
 
-function RnbTileLayer({ selectedRnbIds }: { selectedRnbIds: string[] }) {
+function RnbTileLayer({ selectedRnbIds, onSelectRnbIdOnMap }: { selectedRnbIds: string[], onSelectRnbIdOnMap: (rnbId: string) => void }) {
   const map = useMap();
 
   useEffect(() => {
@@ -249,8 +261,24 @@ function RnbTileLayer({ selectedRnbIds }: { selectedRnbIds: string[] }) {
       });
     }
 
+    // This is a hack to select the closest RNB when clicking on the map
+    // Ideally we would like to use the proper Leaflet API
+    const clickHandler = async (event: LeafletMouseEvent) => {
+      const latlng = event.latlng;
+      const res = await fetch(`https://rnb-api.beta.gouv.fr/api/alpha/buildings/closest/?point=${latlng.lat},${latlng.lng}&radius=5`);
+      const data = await res.json();
+      const rnbIds = data.results.map((result: any) => result.rnb_id);
+      const closestRnbId = rnbIds[0];
+      if (closestRnbId) {
+        onSelectRnbIdOnMap(closestRnbId);
+      }
+    };
+
+    map.on('click', clickHandler);
+
     return () => {
       map.removeLayer(vectorLayer);
+      map.off('click', clickHandler);
     };
   }, [map]);
 
