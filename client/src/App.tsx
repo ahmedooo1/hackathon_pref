@@ -76,7 +76,13 @@ export function App() {
   return (
     <div className="flex h-screen bg-gray-100">
       <Sidebar items={items} selectedItem={selectedItem} onSelect={onSelect} />
-      <DetailPanel key={selectedId} item={selectedItem} onRefuse={handleRefuse} onValidate={handleValidate} />
+      <DetailPanel
+        key={selectedId}
+        item={selectedItem}
+        items={items}
+        onRefuse={handleRefuse}
+        onValidate={handleValidate}
+      />
     </div>
   );
 }
