@@ -1,7 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { RNBList } from './RNBList';
 import { Item, LatLng } from '../types';
 import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet.vectorgrid';
 
 interface DetailPanelProps {
   item: Item;
@@ -144,6 +146,7 @@ export function DetailPanel({
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
+                  <RnbTileLayer />
                   <BoundsController bounds={mapBounds} />
                   <Polygon
                     positions={item.zone}
@@ -212,6 +215,34 @@ function BoundsController({ bounds }: { bounds: LatLng[] }) {
     }
     map.fitBounds(bounds, { padding: [30, 30] });
   }, [bounds, map]);
+
+  return null;
+}
+
+function RnbTileLayer() {
+  const map = useMap();
+
+  useEffect(() => {
+    const vectorLayer = L.vectorGrid.protobuf("https://rnb-api.beta.gouv.fr/api/alpha/tiles/shapes/{x}/{y}/{z}.pbf", {
+      vectorTileLayerStyles: {
+        default: {
+          fillColor: '#9CA3AF',
+          color: '#6B7280',
+          weight: 0.4,
+          fillOpacity: 0.5
+        }
+      },
+      interactive: false,
+      zIndex: 350,
+      opacity: 1
+    });
+
+    vectorLayer.addTo(map);
+
+    return () => {
+      map.removeLayer(vectorLayer);
+    };
+  }, [map]);
 
   return null;
 }
