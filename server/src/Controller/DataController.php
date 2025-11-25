@@ -22,6 +22,11 @@ final class DataController extends AbstractController
             // conversion des ibs RNB pour les rendre exploitables
             if (array_key_exists(PostgreSqlService::RNB_API_IDS_KEYS, $adresseReconciliee)) {
                 $datasReconciliees[$adresseReconcilieeKey][PostgreSqlService::RNB_API_IDS_KEYS] = $postgreSqlService->getRnbIds($adresseReconciliee);
+            };
+        }
+
+        foreach ($datasReconciliees as $adresseReconcilieeKey => $adresseReconciliee) {
+            if (array_key_exists(PostgreSqlService::RNB_API_IDS_KEYS, $adresseReconciliee)) {
                 foreach ($adresseReconciliee[PostgreSqlService::RNB_API_IDS_KEYS] as $rnbId) {
                     $datasReconciliees[$adresseReconcilieeKey]['BatimentsRnb'][$rnbId] = $rnbApiService->getRnbData($rnbId);
                 }
@@ -35,5 +40,7 @@ final class DataController extends AbstractController
         // return $this->render('data/index.html.twig', [
         //     'controller_name' => 'DataController',
         // ]);
+
+        //changer de return pour visualiser le dump des données
     }
 }
