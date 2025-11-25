@@ -1,5 +1,4 @@
 import { Item, LatLng } from '../types';
-import data from '../data.json';
 import { Buffer } from 'buffer';
 
 type RawItem = {
@@ -19,7 +18,15 @@ type RawItem = {
   geometry?: string;
 };
 
-const rawDataset = data as RawItem[];
+async function fetchRawDataset(): Promise<RawItem[]> {
+  const response = await fetch('/api/items');
+  if (!response.ok) {
+    throw new Error('Impossible de charger les données');
+  }
+
+  const dataset = await response.json();
+  return dataset as RawItem[];
+}
 
 function parseRnbIds(rnbIdsString: string): string[] {
   try {
@@ -84,12 +91,32 @@ function parseGeometryPoint(geometry?: string): LatLng {
   }
 }
 
+function containsSegment(source?: string, segment?: string): boolean {
+  if (!source || !segment) {
+    return false;
+  }
+  return source.toLowerCase().includes(segment.toLowerCase());
+}
+
 function transformRawItem(rawItem: RawItem): Item {
   const parsedRnbIds = parseRnbIds(rawItem.rnb_ids);
   const contrePropositionRnbIds = parseRnbIds(rawItem.contre_proposition_rnb_ids);
-  const postalCode = rawItem.Code_Postal ? rawItem.Code_Postal.toString() : '';
-  const addressParts = [rawItem.Adresse, postalCode, rawItem.Ville].filter(Boolean);
-  const address = addressParts.join(' ');
+  const postalCode = rawItem.Code_Postal ? rawItem.Code_Postal.toString().trim() : '';
+  const city = rawItem.Ville ? rawItem.Ville.trim() : '';
+  const addressSegments = [] as string[];
+  if (rawItem.Adresse) {
+    const trimmedAddress = rawItem.Adresse.trim();
+    if (trimmedAddress.length) {
+      addressSegments.push(trimmedAddress);
+    }
+  }
+  if (postalCode && !addressSegments.some(segment => containsSegment(segment, postalCode))) {
+    addressSegments.push(postalCode);
+  }
+  if (city && !addressSegments.some(segment => containsSegment(segment, city))) {
+    addressSegments.push(city);
+  }
+  const address = addressSegments.join(' ');
   const coordinates = toLatLng(rawItem.coordinates);
   const parsedGeometry = parseGeometryPoint(rawItem.geometry);
   const finalCoordinates = coordinates[0] === 0 && coordinates[1] === 0 ? parsedGeometry : coordinates;
@@ -110,6 +137,7 @@ function transformRawItem(rawItem: RawItem): Item {
 }
 
 export async function fetchItems(): Promise<Item[]> {
+  const rawDataset = await fetchRawDataset();
   return rawDataset.map(transformRawItem);
 }
 

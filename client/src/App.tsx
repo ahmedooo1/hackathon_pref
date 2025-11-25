@@ -5,6 +5,11 @@ import { DetailPanel } from './components/DetailPanel';
 import { Item } from './types';
 import { fetchItems } from './api/fetchItems';
 
+const HEADER_BRAND = [
+  { label: 'République française', caption: 'Préfecture', logo: '/assets/republique-francaise.png' },
+  { label: 'Référentiel National des Bâtiments', caption: 'RNB', logo: '/assets/rnb-logo.png' }
+];
+
 export function App() {
   const { data: items = [], isLoading, error } = useQuery({
     queryKey: ['items'],
@@ -74,15 +79,30 @@ export function App() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <Sidebar items={items} selectedItem={selectedItem} onSelect={onSelect} />
-      <DetailPanel
-        key={selectedId}
-        item={selectedItem}
-        items={items}
-        onRefuse={handleRefuse}
-        onValidate={handleValidate}
-      />
+    <div className="flex min-h-screen flex-col bg-gray-100">
+      <header className="flex items-center border-b border-gray-200 bg-white px-6 py-5 shadow-sm">
+        <div className="flex items-center gap-10">
+          {HEADER_BRAND.map(brand => (
+            <div key={brand.label} className="flex items-center gap-4">
+              <img src={brand.logo} alt={brand.label} className="h-24 w-auto" />
+              <div>
+                <p className="text-sm font-semibold text-gray-700">{brand.label}</p>
+                <p className="text-xs uppercase tracking-widest text-gray-500">{brand.caption}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </header>
+      <div className="flex flex-1">
+        <Sidebar items={items} selectedItem={selectedItem} onSelect={onSelect} />
+        <DetailPanel
+          key={selectedId}
+          item={selectedItem}
+          items={items}
+          onRefuse={handleRefuse}
+          onValidate={handleValidate}
+        />
+      </div>
     </div>
   );
 }
