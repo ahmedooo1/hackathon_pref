@@ -18,3 +18,9 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+    App\Service\PostgreSqlService:
+        arguments:
+            $ipv4: '%env(VPS_IPV4)%'
+            $port: '%env(VPS_PORT)%'
+            $user: '%env(VPS_USER)%'
+            $password: '%env(VPS_MDP)%'
