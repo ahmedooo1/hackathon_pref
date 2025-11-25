@@ -67,6 +67,7 @@ class PostgreSqlService {
             FROM data_bat.%s
             LIMIT 10
         ', self::BASE_TABLE));
+        //TODO: retirer LIMIT 10 pour récupérer toutes les adresses
     }
 
     /**

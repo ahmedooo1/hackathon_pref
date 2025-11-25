@@ -8,6 +8,13 @@ framework:
     #esi: true
     #fragments: true
 
+    http_client:
+        scoped_clients:
+            rnb_api_client:
+                base_uri: '%rnb_api_base_url%'
+                headers:
+                    accept: '*/*'
+
 when@test:
     framework:
         test: true
