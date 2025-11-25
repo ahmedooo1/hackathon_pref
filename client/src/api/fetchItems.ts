@@ -18,6 +18,7 @@ type RawItem = {
   geometry?: string;
 };
 
+// Récupère les données brutes depuis l'API interne.
 async function fetchRawDataset(): Promise<RawItem[]> {
   const response = await fetch('/api/items');
   if (!response.ok) {
@@ -28,6 +29,7 @@ async function fetchRawDataset(): Promise<RawItem[]> {
   return dataset as RawItem[];
 }
 
+// Parse la chaîne SQL contenant les IDs RNB en tableau.
 function parseRnbIds(rnbIdsString: string): string[] {
   try {
     const cleaned = rnbIdsString.replace(/'/g, '"');
@@ -37,6 +39,7 @@ function parseRnbIds(rnbIdsString: string): string[] {
   }
 }
 
+// Conversion simple de tuple [lng, lat] vers le format leaflet [lat, lng].
 function toLatLng(tuple?: [number, number]): LatLng {
   if (!tuple) {
     return [0, 0];
@@ -45,6 +48,7 @@ function toLatLng(tuple?: [number, number]): LatLng {
   return [Number(lat) || 0, Number(lng) || 0];
 }
 
+// Génère un polygone autour de la zone fournie ou crée un carré autour des coordonnées.
 function buildZone(rawZone: RawItem['zone'], fallback: LatLng): LatLng[] {
   if (Array.isArray(rawZone) && rawZone.length > 0) {
     return rawZone.map(point => toLatLng(point));
@@ -61,6 +65,7 @@ function buildZone(rawZone: RawItem['zone'], fallback: LatLng): LatLng[] {
   ];
 }
 
+// Décode un point WKB hexadécimal en coordonnées lat/long.
 function parseGeometryPoint(geometry?: string): LatLng {
   if (!geometry) {
     return [0, 0];
@@ -91,6 +96,7 @@ function parseGeometryPoint(geometry?: string): LatLng {
   }
 }
 
+// Teste si un segment de chaîne est contenu (sans tenir compte de la casse).
 function containsSegment(source?: string, segment?: string): boolean {
   if (!source || !segment) {
     return false;
@@ -98,6 +104,7 @@ function containsSegment(source?: string, segment?: string): boolean {
   return source.toLowerCase().includes(segment.toLowerCase());
 }
 
+// Transforme un rawItem côté backend en Item consommé par le front.
 function transformRawItem(rawItem: RawItem): Item {
   const parsedRnbIds = parseRnbIds(rawItem.rnb_ids);
   const contrePropositionRnbIds = parseRnbIds(rawItem.contre_proposition_rnb_ids);
@@ -136,6 +143,7 @@ function transformRawItem(rawItem: RawItem): Item {
   };
 }
 
+// Point d'entrée utilisé par TanStack Query pour charger tous les items.
 export async function fetchItems(): Promise<Item[]> {
   const rawDataset = await fetchRawDataset();
   return rawDataset.map(transformRawItem);

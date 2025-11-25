@@ -1,52 +1,32 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Item } from '../types';
+import { filterItems, FilterMode } from '../utils/filterItems';
 
 interface SidebarProps {
   items: Item[];
-  selectedItem: Item;
+  activeItemId?: string | null;
   onSelect: (item: Item) => void;
 }
 
 export function Sidebar({
   items,
-  selectedItem,
+  activeItemId,
   onSelect
 }: SidebarProps) {
+  // Barre latérale de filtrage et sélection des sites avec recherche textuelle.
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<'all' | 'reference' | 'rnb' | 'address'>('all');
+  const [filter, setFilter] = useState<FilterMode>('all');
   const [showFilters, setShowFilters] = useState(false);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (q.length === 0) return items;
-    return items.filter(item => {
-      const idStr = String(item.id).toLowerCase();
-      const nameStr = item.name ? String(item.name).toLowerCase() : '';
-      const addrStr = item.address ? String(item.address).toLowerCase() : '';
-      const rnbMatch = Array.isArray(item.rnbIds) && item.rnbIds.some(r => String(r).toLowerCase().includes(q));
+  const filtered = useMemo<Item[]>(() => filterItems(items, query, filter), [items, query, filter]);
 
-      if (filter === 'reference') {
-        return idStr.includes(q) || nameStr.includes(q);
-      }
-      if (filter === 'rnb') {
-        return rnbMatch;
-      }
-      if (filter === 'address') {
-        return addrStr.includes(q);
-      }
-      // default: all (reference, rnb, address)
-      return idStr.includes(q) || nameStr.includes(q) || addrStr.includes(q) || rnbMatch;
-    });
-  }, [items, query, filter]);
-
-  const placeholder =
-    filter === 'all'
-      ? 'Rechercher'
-      : filter === 'reference'
-      ? 'Rechercher par référence...'
-      : filter === 'rnb'
-      ? 'Rechercher par RNB...'
-      : 'Rechercher par adresse...';
+  const placeholderMap: Record<FilterMode, string> = {
+    all: 'Rechercher',
+    reference: 'Rechercher par référence...',
+    rnb: 'Rechercher par RNB...',
+    address: 'Rechercher par adresse...'
+  };
+  const placeholder = placeholderMap[filter];
 
   return (
     <div className="w-80 bg-white border-r border-gray-200 flex flex-col h-screen">
@@ -106,10 +86,10 @@ export function Sidebar({
             key={item.id}
             onClick={() => onSelect(item)}
             className={`w-full text-left p-4 border-b border-gray-100 transition-all ${
-              selectedItem.id === item.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'hover:bg-gray-50'
+              activeItemId === item.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'hover:bg-gray-50'
             }`}
           >
-            <div className={`font-semibold text-sm mb-1 ${selectedItem.id === item.id ? 'text-blue-700' : 'text-gray-900'}`}>
+            <div className={`font-semibold text-sm mb-1 ${activeItemId === item.id ? 'text-blue-700' : 'text-gray-900'}`}>
               {item.id}
             </div>
             <div className="text-sm text-gray-600">{item.name}</div>

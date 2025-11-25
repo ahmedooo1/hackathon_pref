@@ -1,16 +1,16 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RNBList } from './RNBList';
 import { Item, LatLng } from '../types';
-import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, useMap, LayersControl, LayerGroup } from 'react-leaflet';
-import L, { LeafletMouseEvent } from 'leaflet';
-import 'leaflet.vectorgrid';
+import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, LayersControl, LayerGroup } from 'react-leaflet';
 import { useQueryClient } from '@tanstack/react-query';
+import { BASE_TILE_LAYERS, OVERLAY_TILE_LAYERS, BoundsController, RnbTileLayer } from './mapUtils';
 
 interface DetailPanelProps {
   item: Item;
   items: Item[];
   onRefuse: () => void;
   onValidate: () => void;
+  onBackToMap: () => void;
 }
 
 interface EditableItem {
@@ -28,67 +28,15 @@ interface ToastMessage {
   variant: ToastVariant;
 }
 
-const metaEnv = ((import.meta as any)?.env ?? {}) as Record<string, string> & { DEV?: boolean };
-const RNB_API_BASE = metaEnv.VITE_RNB_API ?? (metaEnv.DEV ? '/rnb' : 'https://rnb-api.beta.gouv.fr');
-
-const DEFAULT_TILE_STYLE: L.PathOptions = {
-  fillColor: '#CBD5E1',
-  color: '#94A3B8',
-  weight: 0.6,
-  fillOpacity: 0.18
-};
-
-const SELECTED_TILE_STYLE: L.PathOptions = {
-  fillColor: '#EA580C',
-  color: '#C2410C',
-  weight: 1.6,
-  fillOpacity: 0.65
-};
-
-const CLICK_DEBOUNCE_MS = 600;
-
-const BASE_TILE_LAYERS = [
-  {
-    name: 'Plan (IGN)',
-    url: 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-    attribution: '© IGN / © OSM contributors',
-    maxZoom: 19
-  },
-  {
-    name: 'Plan (OSM)',
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '© OpenStreetMap contributors',
-    maxZoom: 19
-  },
-  {
-    name: 'Satellite',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AeroGRID, IGN, and the GIS User Community',
-    maxZoom: 19
-  }
-];
-
-const OVERLAY_TILE_LAYERS = [
-  {
-    name: 'Cadastre',
-    url: 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-    attribution: '© Cadastre / © OSM contributors',
-    opacity: 0.55
-  },
-  {
-    name: 'Adresses BAN',
-    url: 'https://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png',
-    attribution: '© BAN · © OSM contributors',
-    opacity: 0.55
-  }
-];
 
 export function DetailPanel({
   item,
   items,
   onRefuse,
-  onValidate
+  onValidate,
+  onBackToMap
 }: DetailPanelProps) {
+  // États locaux pour gérer les IDs RNB sélectionnés, le formulaire éditable et les toasts.
   const [rnbIds, setRnbIds] = useState<string[]>(item.rnbIds);
   const [formData, setFormData] = useState<EditableItem>({
     address: item.address ?? '',
@@ -113,6 +61,7 @@ export function DetailPanel({
     });
   }, [item]);
 
+  // Prépare les limites de la carte en utilisant soit la zone soit le point unique.
   const mapBounds = useMemo<LatLng[]>(() => {
     if (item.zone.length === 0) {
       return [item.coordinates];
@@ -152,6 +101,7 @@ export function DetailPanel({
     setIsEditing(false);
   };
 
+  // Affiche un message en haut de l'écran pendant quelques secondes.
   const showToast = (message: string, variant: ToastVariant) => {
     if (toastTimerRef.current) {
       window.clearTimeout(toastTimerRef.current);
@@ -197,9 +147,26 @@ export function DetailPanel({
     }
   };
 
-  const handleValidate = () => {
-    showToast('Validation enregistrée', 'success');
-    onValidate();
+  const handleValidate = async () => {
+    try {
+      const response = await fetch(`/api/items/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rnbIds })
+      });
+
+      if (!response.ok) {
+        throw new Error('Impossible d\'enregistrer les sélections RNB');
+      }
+
+      await response.json();
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+      showToast('Validation enregistrée', 'success');
+      onValidate();
+    } catch (error) {
+      showToast('Erreur lors de la validation', 'error');
+      console.error(error);
+    }
   };
 
   const handleRefuse = () => {
@@ -207,7 +174,7 @@ export function DetailPanel({
     onRefuse();
   };
 
-  return <div className="flex-1 flex flex-col bg-gray-50 h-screen">
+  return <div className="flex-1 flex flex-col bg-gray-50">
       {toast && (
         <div className={`fixed top-6 right-6 rounded-xl px-6 py-3 text-base font-semibold shadow-lg ${toast.variant === 'success' ? 'bg-emerald-500 text-white' : toast.variant === 'warning' ? 'bg-amber-500 text-white' : 'bg-red-500 text-white'}`}>
           {toast.message}
@@ -215,7 +182,20 @@ export function DetailPanel({
       )}
       <div className="flex-1 overflow-y-auto p-6 sm:p-8">
         <div className="max-w-5xl mx-auto space-y-6 pb-6">
-        
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-500">Vue détaillée du site</p>
+            <button
+              type="button"
+              onClick={onBackToMap}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M3 12h4m-2-2 2 2-2 2" />
+                <path d="M7 12h14" />
+              </svg>
+              Carte Complete
+            </button>
+          </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 space-y-6">
             <div className="flex items-start justify-between gap-4">
@@ -354,6 +334,7 @@ export function DetailPanel({
             <RNBList items={rnbIds} onDelete={onDeleteRNB} />
           </div>
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              {/* Mini-carte qui affiche les points, les polygones RNB et la sélection actuelle. */}
             <div className="px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <p className="text-xs font-semibold tracking-widest text-indigo-600 uppercase">
@@ -471,6 +452,7 @@ export function DetailPanel({
 
       <div className="border-t border-gray-200 bg-white shadow-lg">
         <div className="max-w-5xl mx-auto px-8 py-4 flex gap-3 justify-end">
+              {/* Actions de validation/refus présentant le toast et déclenchant l'API. */}
           <button onClick={handleRefuse} className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors flex items-center gap-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path d="M18 6L6 18M6 6l12 12" />
@@ -488,103 +470,3 @@ export function DetailPanel({
     </div>;
 }
 
-function BoundsController({ bounds }: { bounds: LatLng[] }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!bounds.length) {
-      return;
-    }
-    map.fitBounds(bounds, { padding: [30, 30] });
-  }, [bounds, map]);
-
-  return null;
-}
-
-function RnbTileLayer({ selectedRnbIds, onSelectRnbIdOnMap }: { selectedRnbIds: string[], onSelectRnbIdOnMap: (rnbId: string) => void }) {
-  const map = useMap();
-  const vectorLayerRef = useRef<any>(null);
-  const previousSelectionRef = useRef<string[]>([]);
-  const lastClickRef = useRef<number>(0);
-
-  useEffect(() => {
-    const vectorLayer = L.vectorGrid.protobuf(`${RNB_API_BASE}/api/alpha/tiles/shapes/{x}/{y}/{z}.pbf`, {
-      vectorTileLayerStyles: {
-        default: DEFAULT_TILE_STYLE
-      },
-      interactive: false,
-      getFeatureId: (feature: any) => feature.properties.rnb_id,
-      zIndex: 350,
-      opacity: 1
-    });
-
-    vectorLayerRef.current = vectorLayer;
-    vectorLayer.addTo(map);
-
-    const clickHandler = async (event: LeafletMouseEvent) => {
-      const now = Date.now();
-      if (now - lastClickRef.current < CLICK_DEBOUNCE_MS) {
-        return;
-      }
-      lastClickRef.current = now;
-
-      const { lat, lng } = event.latlng;
-      try {
-        const res = await fetch(`${RNB_API_BASE}/api/alpha/buildings/closest/?point=${lat},${lng}&radius=5`);
-        if (!res.ok) {
-          console.warn('Recherche RNB impossible', res.status);
-          return;
-        }
-        const data = await res.json();
-        const rnbId = data.results?.[0]?.rnb_id;
-        if (rnbId) {
-          onSelectRnbIdOnMap(rnbId);
-        }
-      } catch (error) {
-        console.error('Erreur lors de la sélection RNB sur la carte', error);
-      }
-    };
-
-    map.on('click', clickHandler);
-
-    return () => {
-      map.off('click', clickHandler);
-      if (vectorLayerRef.current) {
-        map.removeLayer(vectorLayerRef.current);
-        vectorLayerRef.current = null;
-      }
-      previousSelectionRef.current = [];
-      lastClickRef.current = 0;
-    };
-  }, [map, onSelectRnbIdOnMap]);
-
-  useEffect(() => {
-    const vectorLayer = vectorLayerRef.current;
-    if (!vectorLayer) {
-      return;
-    }
-
-    const previous = previousSelectionRef.current;
-    for (const prevId of previous) {
-      if (!selectedRnbIds.includes(prevId)) {
-        try {
-          vectorLayer.resetFeatureStyle(prevId as any);
-        } catch (error) {
-          console.warn('Impossible de réinitialiser le style du RNB', prevId, error);
-        }
-      }
-    }
-
-    for (const rnbId of selectedRnbIds) {
-      try {
-        vectorLayer.setFeatureStyle(rnbId as any, SELECTED_TILE_STYLE);
-      } catch (error) {
-        console.warn('Impossible de styliser le RNB', rnbId, error);
-      }
-    }
-
-    previousSelectionRef.current = selectedRnbIds;
-  }, [selectedRnbIds]);
-
-  return null;
-}
