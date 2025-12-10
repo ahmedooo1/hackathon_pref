@@ -3,6 +3,7 @@
 /server/.env.*.local
 /server/config/secrets/prod/prod.decrypt.private.php
 /server/public/bundles/
+/server/public/assets/
 /server/var/
 /server/vendor/
 

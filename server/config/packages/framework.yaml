@@ -14,6 +14,7 @@ framework:
                 base_uri: '%rnb_api_base_url%'
                 headers:
                     accept: '*/*'
+                proxy: '%env(HTTP_PROXY)%'
 
 when@test:
     framework:

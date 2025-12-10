@@ -23,7 +23,7 @@
 
 ## 🛠 Mode d'emploi
 - Modifier le paramètre SQL LIMIT dans la fonction getDataReconciliees() de la classe Src/Service/PostgreSqlService pour indiquer combien d'adresses récupérer (attention aux limites d'appel par seconde de l'api RNB en conséquence)
-- Appeler la route /data pour récupérer les données en JSON
+- Appeler la route /data/import pour récupérer les données en JSON
 
 ---
 
