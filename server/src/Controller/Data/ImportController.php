@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controller\Data;
 
 use App\Service\PostgreSqlService;
