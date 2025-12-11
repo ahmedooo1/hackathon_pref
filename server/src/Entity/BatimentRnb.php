@@ -16,7 +16,7 @@ class BatimentRnb
     use TraitId;
 
     #[ORM\Column(type: 'integer', unique: true, options: ['unsigned' => true])]
-    private int $rndId;
+    private int $rnbId;
 
     #[ORM\Column(type: 'string', length: 255)]
     private string $status;
@@ -36,14 +36,14 @@ class BatimentRnb
     #[ORM\ManyToOne(targetEntity: Adresse::class, inversedBy: 'batimentsRnb')]
     private Adresse $adresse;
 
-    public function getRndId(): int
+    public function getRnbId(): int
     {
-        return $this->rndId;
+        return $this->rnbId;
     }
 
-    public function setRndId(int $rndId): void
+    public function setRnbId(int $rnbId): void
     {
-        $this->rndId = $rndId;
+        $this->rnbId = $rnbId;
     }
 
     public function getStatus(): string

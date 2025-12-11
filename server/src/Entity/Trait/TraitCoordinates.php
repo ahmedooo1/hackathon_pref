@@ -8,10 +8,10 @@ use Doctrine\ORM\Mapping as ORM;
 
 trait TraitCoordinates
 {
-    #[ORM\Column(type: 'float', options: ['unsigned' => true])]
+    #[ORM\Column(type: 'float')]
     private float $longitude;
 
-    #[ORM\Column(type: 'float', options: ['unsigned' => true])]
+    #[ORM\Column(type: 'float')]
     private float $latitude;
 
     public function setLongitude(float $longitude): void

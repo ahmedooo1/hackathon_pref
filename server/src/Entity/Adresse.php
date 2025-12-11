@@ -179,6 +179,18 @@ class Adresse
         $this->fiabilite = $fiabilite;
     }
 
+    /** @returns array<string> */
+    public function getRnbIds(): array
+    {
+        return $this->rnbIds;
+    }
+
+    /** @param array<string> $rnbIds */
+    public function setRnbIds(array $rnbIds): void
+    {
+        $this->rnbIds = $rnbIds;
+    }
+
     public function getSource(): ?string
     {
         return $this->source;
