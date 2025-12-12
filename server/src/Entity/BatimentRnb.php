@@ -7,6 +7,7 @@ namespace App\Entity;
 use App\Entity\Adresse;
 use App\Entity\Point;
 use App\Entity\Trait\TraitId;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -15,8 +16,8 @@ class BatimentRnb
 {
     use TraitId;
 
-    #[ORM\Column(type: 'integer', unique: true, options: ['unsigned' => true])]
-    private int $rnbId;
+    #[ORM\Column(type: 'string', unique: true)]
+    private string $rnbId;
 
     #[ORM\Column(type: 'string', length: 255)]
     private string $status;
@@ -36,12 +37,17 @@ class BatimentRnb
     #[ORM\ManyToOne(targetEntity: Adresse::class, inversedBy: 'batimentsRnb')]
     private Adresse $adresse;
 
-    public function getRnbId(): int
+    public function __construct()
+    {
+        $this->polygone = new ArrayCollection();
+    }
+
+    public function getRnbId(): string
     {
         return $this->rnbId;
     }
 
-    public function setRnbId(int $rnbId): void
+    public function setRnbId(string $rnbId): void
     {
         $this->rnbId = $rnbId;
     }

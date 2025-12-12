@@ -18,24 +18,22 @@ final class ImportController extends AbstractController
     public function load(PostgreSqlService $postgreSqlService, RnbApiService $rnbApiService): Response
     {
         $datasReconciliees = $postgreSqlService->getDataReconciliees();
-        dump($datasReconciliees);
 
         foreach ($datasReconciliees as $adresseReconcilieeKey => $adresseReconciliee) {
-            // conversion des ibs RNB pour les rendre exploitables
+            // conversion des ids RNB pour les rendre exploitables et récupération des données RNB
             if (array_key_exists(PostgreSqlService::RNB_API_IDS_KEYS, $adresseReconciliee)) {
-                $datasReconciliees[$adresseReconcilieeKey][PostgreSqlService::RNB_API_IDS_KEYS] = $postgreSqlService->getRnbIds($adresseReconciliee);
-            };
-        }
+                $ids = $postgreSqlService->getRnbIds($adresseReconciliee);
+                $datasReconciliees[$adresseReconcilieeKey][PostgreSqlService::RNB_API_IDS_KEYS] = $ids;
 
-        foreach ($datasReconciliees as $adresseReconcilieeKey => $adresseReconciliee) {
-            if (array_key_exists(PostgreSqlService::RNB_API_IDS_KEYS, $adresseReconciliee)) {
-                foreach ($adresseReconciliee[PostgreSqlService::RNB_API_IDS_KEYS] as $rnbId) {
-                    $datasReconciliees[$adresseReconcilieeKey]['BatimentsRnb'][$rnbId] = $rnbApiService->getRnbData($rnbId);
+                foreach ($ids as $rnbId) {
+                    $datasReconciliees[$adresseReconcilieeKey]['batimentsRnb'][$rnbId] = $rnbApiService->getRnbData($rnbId);
                 }
-            };
+            }
+
+            //enregistrement en base de données
+            $adresseEntity = $postgreSqlService->registerAdresse($datasReconciliees[$adresseReconcilieeKey]);
         }
 
-        dump($datasReconciliees);
         //return $this->json($datasReconciliees);
         return $this->render('data/index.html.twig', [
             'controller_name' => 'DataController',

@@ -41,7 +41,7 @@ class Adresse
     #[ORM\Column(type: 'string', length: 255)]
     private string $fiabiliteAdresse;
 
-    #[ORM\Column(type: 'string', length: 255)]
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $casAdresse = null;
 
     #[ORM\Column(type: 'string', length: 255)]
@@ -53,16 +53,16 @@ class Adresse
     #[ORM\Column(type: 'string', length: 255)]
     private string $fiabilite;
 
-    #[ORM\Column(type: 'string', length: 255)]
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $source = null;
 
     #[ORM\Column(type: 'json')]
     public array $rnbIds = [];
 
-    #[ORM\Column(type: 'string', length: 1020)]
+    #[ORM\Column(type: 'string', length: 5100)]
     private string $geometry;
 
-    #[ORM\OneToMany(mappedBy: 'adresse', targetEntity: BatimentRnb::class)]
+    #[ORM\OneToMany(mappedBy: 'adresse', targetEntity: BatimentRnb::class, cascade: ['persist'])]
     private Collection $batimentsRnb;
 
     public function __construct()

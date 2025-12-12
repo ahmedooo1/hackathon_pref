@@ -18,12 +18,12 @@ class Point
     #[ORM\ManyToOne(targetEntity: BatimentRnb::class, inversedBy: 'polygone')]
     private ?BatimentRnb $polygone = null;
 
-    public function getBatimentRNBPolygone(): ?BatimentRnb
+    public function getBatimentRnbPolygone(): ?BatimentRnb
     {
         return $this->polygone;
     }
 
-    public function setBatimentRNBPolygone(?BatimentRnb $polygone): void
+    public function setBatimentRnbPolygone(?BatimentRnb $polygone): void
     {
         $this->polygone = $polygone;
     }
