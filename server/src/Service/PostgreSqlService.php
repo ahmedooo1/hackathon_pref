@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Entity\Adresse;
+use App\Entity\BatimentRnb;
+use App\Entity\Point;
+use Doctrine\ORM\EntityManagerInterface;
+use InvalidArgumentException;
 use PDO;
 
 class PostgreSqlService {
@@ -16,13 +21,16 @@ class PostgreSqlService {
     private string $port;
     private string $user;
     private string $password;
+    private EntityManagerInterface $entityManager;
 
-    public function __construct (string $ipv4, string $port, string $user, string $password) {
+    public function __construct (string $ipv4, string $port, string $user, string $password, EntityManagerInterface $entityManager) {
         // variables d'environnement injectées par les fichiers de configuration à renseigner dans le fichier .env.local
         $this->ipv4 = $ipv4;
         $this->port = $port;
         $this->user = $user;
         $this->password = $password;
+
+        $this->entityManager = $entityManager;
     }
 
     /** 
@@ -65,7 +73,7 @@ class PostgreSqlService {
         return $this->executeQuery($pdo, sprintf('
             SELECT *
             FROM data_bat.%s
-            LIMIT 10
+            LIMIT 5
         ', self::BASE_TABLE));
         //TODO: retirer LIMIT 10 pour récupérer toutes les adresses
     }
@@ -84,5 +92,104 @@ class PostgreSqlService {
         $rnbIdsJson = str_replace('\'', '"', $rnbIdsRaw);
 
         return json_decode($rnbIdsJson, true);
+    }
+
+    /**
+     * Enregistre une adresse réconciliée et ses bâtiments RNB associés en base de données.
+     * 
+     * @param array $adresseData données récupérées depuis la bdd d'adresse reconciliée et l'api rnb.
+     * 
+     * @throws InvalidArgumentException si les données minimales nécessaires pour l'enregistrement sont manquantes.
+     * 
+     * @return Adresse l'entité Adresse enregistrée.
+     */
+    public function registerAdresse(array $adresseData): Adresse
+    {
+        //vérification des données obligatoires
+        if (
+            !array_key_exists('Code_bat_ter', $adresseData) ||
+            !array_key_exists('région', $adresseData) ||
+            !array_key_exists('département', $adresseData) ||
+            !array_key_exists('meilleure_adresse_score_levenshtein', $adresseData) || 
+            !array_key_exists('fiabilite_adresse', $adresseData) ||
+            !array_key_exists('Définition.du.cas', $adresseData) ||
+            !array_key_exists('fiabilité_rnb_die_vs_cerema', $adresseData) ||
+            !array_key_exists('fiabilité', $adresseData) ||
+            !array_key_exists('cerema_cstb_rnb_ids', $adresseData) ||
+            !array_key_exists('geom', $adresseData)
+        ) {
+            Throw new InvalidArgumentException('Données d\'adresse obligatoires manquantes pour l\'enregistrement.');
+        }
+
+        // si une adresse existe déjà avec ce code bat, on la récupère, sinon on en crée une nouvelle
+        $adresse = $this->entityManager->getRepository(Adresse::class)->findOneBy(['codeBatTer' => (int)$adresseData['Code_bat_ter']]) ?? new Adresse();
+
+        //insertion des données de l'adresse
+        $adresse->setCodeBatTer((int)$adresseData['Code_bat_ter']);
+        $adresse->setRegion($adresseData['région']);
+        $adresse->setDepartement((int)$adresseData['département']);
+        if (array_key_exists('die_adresse', $adresseData)) {
+            $adresse->setDieAdresse($adresseData['die_adresse']);
+        }
+        if (array_key_exists('meilleure_adresse_rnb', $adresseData)) {
+            $adresse->setMeilleureAdresseRnb($adresseData['meilleure_adresse_rnb']);
+        }
+        $adresse->setScoreLevenshtein((float)$adresseData['meilleure_adresse_score_levenshtein']);
+        $adresse->setFiabiliteAdresse($adresseData['fiabilite_adresse']);
+        if (array_key_exists('Cas_adresses', $adresseData)) {
+            $adresse->setCasAdresse($adresseData['Cas_adresses']);
+        }
+        $adresse->setDefinitionCas($adresseData['Définition.du.cas']);
+        $adresse->setFiabiliteRnbDieVsCerema($adresseData['fiabilité_rnb_die_vs_cerema']);
+        $adresse->setFiabilite($adresseData['fiabilité']);
+        if (array_key_exists('source', $adresseData)) {
+            $adresse->setSource($adresseData['source']);
+        }
+        $adresse->setRnbIds($adresseData['cerema_cstb_rnb_ids']);
+        $adresse->setGeometry($adresseData['geom']);
+
+        //insertion des données des bâtiments s'il y en a
+        if (array_key_exists('batimentsRnb', $adresseData)) {
+            foreach ($adresseData['batimentsRnb'] as $batimentRnbData) {
+                $batimentRnb = new BatimentRnb();
+                //vérification des données
+                if (
+                    !array_key_exists('rnb_id', $batimentRnbData) ||
+                    !array_key_exists('status', $batimentRnbData) ||
+                    !array_key_exists('is_active', $batimentRnbData) ||
+                    !array_key_exists('point', $batimentRnbData) ||
+                    !array_key_exists('shape', $batimentRnbData) ||
+                    !array_key_exists('addresses', $batimentRnbData)
+                ) {
+                    continue;
+                }
+
+                $batimentRnb->setRnbId($batimentRnbData['rnb_id']);
+                $batimentRnb->setStatus($batimentRnbData['status']);
+                $batimentRnb->setActive((bool)$batimentRnbData['is_active']);
+                $point = new Point();
+                $point->setLongitude((float)$batimentRnbData['point']['coordinates'][0]);
+                $point->setLatitude((float)$batimentRnbData['point']['coordinates'][1]);
+                $batimentRnb->setPoint($point);
+                foreach ($batimentRnbData['shape']['coordinates'][0][0] as $polygonePointData) {
+                    $polygonePoint = new Point();
+                    $polygonePoint->setLongitude((float)$polygonePointData[0]);
+                    $polygonePoint->setLatitude((float)$polygonePointData[1]);
+                    $polygonePoint->setBatimentRnbPolygone($batimentRnb);
+                    $batimentRnb->addPolygonePoint($polygonePoint);
+                }
+                foreach ($batimentRnbData['addresses'] as $adresseRnb) {
+                    $adressesClesInterop[] = $adresseRnb['id'];
+                    $batimentRnb->setAdressesClesInterop($adressesClesInterop);
+                }
+
+                $batimentRnb->setAdresse($adresse);
+                $adresse->addBatimentRnb($batimentRnb);
+            }
+            $this->entityManager->persist($adresse);
+            $this->entityManager->flush();
+        }
+
+        return $adresse;
     }
 }
