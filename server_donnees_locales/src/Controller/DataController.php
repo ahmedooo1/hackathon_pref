@@ -14,7 +14,7 @@ class DataController extends AbstractController
 
     public function __construct(#[Autowire('%kernel.project_dir%')] string $projectDir)
     {
-        $this->dataPath = $projectDir . '/../client/src/data.json';
+        $this->dataPath = dirname($projectDir) . '/client/src/data.json';
     }
 
     #[Route('/api/items', name: 'app_api_items', methods: ['GET'])]
